@@ -33,7 +33,7 @@ function Graph:add_file(path)
   local code = file:read("*a")
   file:close()
   local deps = {}
-  for bind_name, module_path in code:gmatch("([%w_]+) = require%(\"([^)]+)\"%)") do
+  for bind_name, module_path in code:gmatch("([%w_]+) = require%(['\"]([^)]+)['\"]%)") do
     deps[#deps + 1] = { module_path = module_path, file_path = module_to_path(module_path), bind_name = bind_name }
   end
   self.files[path] = { content = code, deps = deps }
@@ -120,7 +120,7 @@ function Graph:compile()
 
         for _, dep in ipairs(file.deps) do
           -- Replace require with module func call
-          file.content = file.content:gsub(string.format("require%%(\"%s\"%%)", dep.module_path),
+          file.content = file.content:gsub(string.format("require%%(['\"]%s['\"]%%)", dep.module_path),
             self._added[dep.file_path])
         end
       end

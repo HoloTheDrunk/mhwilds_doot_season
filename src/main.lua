@@ -1,3 +1,10 @@
+local Utils = require("lib.utils")
+
+local Logger = require("lib.logger")
+Logger:set_name("doot_season")
+
+local GifResource = require("lib.gif_resource")
+
 local GifManager = require("lib.gif_manager")
 local gif_manager = GifManager.new()
 
@@ -13,31 +20,17 @@ local hunter_character = nil
 local _initialized = false
 local debug = { enabled = true }
 
-local logs = {}
-
 d2d.register(
   function()
-    local frames = {}
-    while true do
-      local path = string.format("doot_season/frame_%02d.png", #frames)
-      local image = d2d.Image.new(path)
-      logs[#logs + 1] = { type = "info", msg = string.format("Loading frame %d from: %s", #frames, path) }
-      if not image then
-        logs[#logs + 1] = { type = "warn", msg = "FAILED" }
-        break
-      end
-      frames[#frames + 1] = image
-    end
-
-    doot = {
-      frames = frames,
-      framerate = 6.6,
-    }
+    doot = GifResource.from_folder("doot_season", 6.6)
   end,
   function()
     if not _initialized then return end
 
-    gif_manager:render()
+    local success, err = pcall(gif_manager.render, gif_manager)
+    if not success then
+      Logger:log("error", err or "Unknown error", "GifManager:render")
+    end
   end
 )
 
@@ -63,6 +56,8 @@ local function init()
 
       local pos = hit_info:call("get_Position")
 
+      Logger:log("debug", "Hit", "horn_attack_hook")
+
       gif_manager:instance(doot, pos)
 
       debug.hit_position = pos
@@ -71,12 +66,12 @@ local function init()
 
   re.on_frame(function()
     gif_manager:update(os.clock())
-    if debug.hit_position then
-      local sp = draw.world_to_screen(debug.hit_position)
-      if sp then
-        draw.filled_circle(sp.x, sp.y, 25, 0xffffffff, 8)
-      end
-    end
+    -- if debug.hit_position then
+    --   local sp = draw.world_to_screen(debug.hit_position)
+    --   if sp then
+    --     draw.filled_circle(sp.x, sp.y, 10, 0xffffffff, 32)
+    --   end
+    -- end
   end)
 
   _initialized = true
@@ -86,11 +81,8 @@ end
 re.on_draw_ui(function()
   if not imgui.tree_node("Doot") then return end
 
-  if imgui.button("Flush logs") then
-    for _, entry in ipairs(logs) do
-      log[entry.type](entry.msg)
-    end
-    logs = {}
+  if imgui.button("Flush logs to console") then
+    Logger:flush()
   end
 
   if not _initialized then
@@ -100,9 +92,24 @@ re.on_draw_ui(function()
     end
   end
 
+  local last_error = d2d.detail.get_last_error()
+  if last_error ~= "" then
+    imgui.text("Last D2D Error:")
+    imgui.text_colored(last_error, 0xFF0000FF)
+  end
+
   if debug.error then
+    imgui.text("Last Script Error:")
     imgui.text_colored(debug.error, 0xffff0000)
   end
+
+  if doot then
+    imgui.text("Doot:" .. Utils.dump(doot, true))
+  end
+
+  gif_manager:on_draw_ui()
+
+  Logger:on_draw_ui()
 
   imgui.tree_pop()
 end)

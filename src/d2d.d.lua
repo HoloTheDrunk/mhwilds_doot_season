@@ -30,9 +30,23 @@ function Font.new(name, size, bold, italic) end
 ---@return integer width, integer height
 function Font:measure(text) end
 
+---@class Detail
+local Detail = {}
+
+---@return string?
+function Detail.get_last_error() end
+
+---@return number
+function Detail.get_max_updaterate() end
+
+---@param rate number
+---@return nil
+function Detail.set_max_updaterate(rate) end
+
 ---@class d2d
 ---@field Image Image
 ---@field Font Font
+---@field detail Detail
 d2d = {}
 
 ---Registers the script with d2d, allowing you to create d2d resources and draw using them.

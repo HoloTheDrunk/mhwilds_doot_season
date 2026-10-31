@@ -10,5 +10,6 @@ mv output.lua "$WILDS_DIR/reframework/autorun/doot_season.lua"
 cd -
 
 TARGET_DIR="$WILDS_DIR/reframework/images/doot_season"
-[ ! -d "$TARGET_DIR" ] && mkdir "$TARGET_DIR"
+[ -d "$TARGET_DIR" ] && rm -rf "$TARGET_DIR"
+mkdir "$TARGET_DIR"
 cp -r ./assets/images/* "$TARGET_DIR"

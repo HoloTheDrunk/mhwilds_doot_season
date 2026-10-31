@@ -1,85 +1,12 @@
 local Utils = require('lib.utils')
-
----@class GifResource
----@field frames Image[]
----@field framerate number
-
----@class Gif
----@field resource GifResource
----@field cur_frame integer
----@field last_frame_time? number
-local Gif = {}
-Gif.__index = Gif
-
----@param resource GifResource
----@return Gif
-function Gif.new(resource)
-  return setmetatable({
-    resource = resource,
-    cur_frame = 0,
-    last_frame_time = nil
-  } --[[@as Gif]], Gif)
-end
-
----@nodiscard
----@param now number
----@return boolean discard true means the gif needs to be dropped.
-function Gif:update(now)
-  if self.last_frame_time and now - self.last_frame_time > 1 / self.resource.framerate then
-    self.cur_frame = self.cur_frame + 1
-    -- Drop gif when the last frame ends
-    if self.cur_frame > #self.resource.frames then
-      return true
-    end
-  end
-  self.last_frame_time = now
-  return false
-end
-
----@param x number
----@param y number
----@param w number
----@param h number
----@return nil
-function Gif:render(x, y, w, h)
-  local image = self.resource.frames[self.cur_frame]
-  d2d.image(image, x, y, w, h)
-end
-
----@class PositionalGif
----@field gif Gif
----@field position Vector3f
-local PositionalGif = {}
-PositionalGif.__index = PositionalGif
-
----@param resource GifResource
----@param position Vector3f
----@return PositionalGif
-function PositionalGif.new(resource, position)
-  return setmetatable({
-    gif = Gif.new(resource),
-    position = position
-  } --[[@as PositionalGif]], PositionalGif)
-end
-
-PositionalGif.update = Gif.update
-
----@param camera_pos Vector3f
----@return nil
-function PositionalGif:render(camera_pos)
-  local screen_pos = draw.world_to_screen(self.position)
-  if not screen_pos then return end
-
-  local d = (camera_pos - self.position):length()
-  local size = 100 / d ^ 2
-  local hsize = size / 2
-
-  self.gif:render(screen_pos.x - hsize, screen_pos.y - hsize, hsize, hsize)
-end
+local Logger = require('lib.logger')
+local PositionalGif = require('lib.positional_gif')
 
 ---@class GifManager
 ---@field private camera_tf? REManagedObject
 ---@field private gifs PositionalGif[]
+---@field private max_update_rate number
+---@field private last_update_time? number
 local GifManager = {}
 GifManager.__index = GifManager
 
@@ -88,6 +15,7 @@ function GifManager.new()
   return setmetatable({
     camera_tf = nil,
     gifs = {},
+    max_update_rate = 30,
   } --[[@as GifManager]], GifManager)
 end
 
@@ -116,6 +44,11 @@ end
 function GifManager:update(now)
   if not self:_init() then return end
 
+  if self.last_update_time and now - self.last_update_time < 1 / self.max_update_rate then
+    return
+  end
+  self.last_update_time = now
+
   ---@type integer[]
   local to_remove = {}
 
@@ -132,12 +65,25 @@ end
 
 ---@return nil
 function GifManager:render()
-  if not self:_init() then return end
+  if not self:_init() then
+    Logger:log("warn", "Failed to init GifManager", "GifManager:render")
+    return
+  end
 
   local camera_pos = self.camera_tf:call("get_Position")
   for _, gif in ipairs(self.gifs) do
     gif:render(camera_pos)
   end
+end
+
+---@return nil
+function GifManager:on_draw_ui()
+  if not self:_init() then
+    Logger:log("warn", "Failed to init GifManager", "GifManager:on_draw_ui")
+    return
+  end
+
+  imgui.text("gif_manager:" .. Utils.dump(self, true))
 end
 
 return GifManager
